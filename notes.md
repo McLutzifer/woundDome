@@ -94,13 +94,57 @@
 
 ## 3. Next Steps / Action Items
 
-| Area | Task | Responsible / Question |
-|------|-------|------------------------|
-| Cameras | Decide whether to use one ESP32-CAM per camera or multiplexed setup. | Confirm feasibility with hardware supervisor. |
-| Calibration | Create or generate a fixed-rig `transforms.json`. | Lukas & Felix |
-| Raspberry Pi Server | Finalize FastAPI + MQTT server implementation. | Lukas |
-| Web UI | Add smartphone-friendly web form or consider physical button trigger. | Ask professor for input. |
-| Cloud GPU | Check with supervisor whether cloud GPU usage (AWS, RunPod) is acceptable. | Lukas |
-| Data Sync | Define method to sync session folders from Pi to GPU/cloud (rsync, scp, API). | TBD |
-| 3D Reconstruction | Test a small dataset with Nerfstudio on GPU. | Lukas & Caroline |
-| Visualization | Decide on visualization method (interactive viewer vs static renders). | Team decision |
+| Area | Task 
+|------|-------|
+| Cameras | Decide whether to use one ESP32-CAM per camera or multiplexed setup. | 
+| Calibration | Create or generate a fixed-rig `transforms.json`. |
+| Raspberry Pi Server | Finalize FastAPI + MQTT server implementation. |
+| Web UI | Add smartphone-friendly web form or consider physical button trigger. |
+| Cloud GPU | Check with supervisor whether cloud GPU usage (AWS, RunPod) is acceptable. | 
+| Data Sync | Define method to sync session folders from Pi to GPU/cloud (rsync, scp, API). | 
+| 3D Reconstruction | Test a small dataset with Nerfstudio on GPU. | 
+| Visualization | Decide on visualization method (interactive viewer vs static renders). | 
+
+
+
+# Open Questions and Undecided Points
+
+## Hardware
+- Do we need one ESP32 module per camera, or is there a simpler way to connect multiple small cameras to one board (e.g., via multiplexing)?  
+- What resolution, exposure control, and lens type are optimal for the 3D reconstruction?  
+- How should we handle power supply and cable management for 20–30 cameras in the tunnel?
+
+## Calibration
+- Is one-time calibration of the fixed camera setup sufficient, or should we recalibrate periodically?  
+- What exact format (e.g., `transforms.json`) and parameters does Gaussian Splatting require for reproducible results?
+
+## Data Collection & Networking
+- Should we keep the Raspberry Pi as the local “hub” (collecting images and metadata) or upload directly to a cloud service?  
+- How should the Raspberry Pi forward completed sessions to the GPU machine or cloud instance (e.g., rsync, scp, API call)?  
+- How do we organize and store session metadata (patient/wound IDs, timestamps) in a standardized structure?  
+
+## Triggering
+- Should the capture be triggered from a web interface (mobile-friendly GUI) or via a physical hardware button?  
+- Is it feasible and secure to host the web interface on the Raspberry Pi and access it from a smartphone over the local network?  
+- Can the second professor assist with the web UI design and frontend implementation?
+
+## Gaussian Splatting / Reconstruction
+- Which reconstruction tool should we ultimately use:  
+  - Nerfstudio (open source, cloud-compatible)  
+  - Jawset Postshot (GUI, commercial, limited automation)?  
+- What preprocessing is needed for the images (background removal, resizing, masking) before splatting?  
+- Where should the reconstruction happen:  
+  - Local GPU workstation (faster, but needs hardware)  
+  - Cloud GPU instance (e.g., AWS, RunPod)?  
+- If using cloud GPUs, is the expected cost per session acceptable for our project budget?  
+- Should the reconstruction be triggered automatically after upload or started manually?
+
+## Output & Visualization
+- How should the resulting 3D models be stored, accessed, or displayed?  
+- Should clinicians view results in the interactive Nerfstudio viewer, or should we generate static renders/screenshots?  
+- If models are produced in the cloud, how do we transfer or visualize them locally (e.g., download `.ply`, host web viewer, screenshots)?
+
+## Collaboration & Supervision
+- Which professor supervises which part (hardware, software, cloud processing, visualization)?  
+- What scope of prototype (number of cameras, automation level) is realistic for this semester’s milestone?  
+
