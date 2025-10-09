@@ -1,5 +1,45 @@
 # Project Summary: Wound-Healing 3D Reconstruction Prototype
 
+# Open Questions and Undecided Points
+
+## Hardware
+- Do we need one ESP32 module per camera?  
+- Do the cams have fixed focus?  
+- How to handle power supply for the cameras?
+- Do we need a flash light?
+- How amny cameras do we need?
+
+## Calibration
+- What format (e.g., `transforms.json`) and parameters does Gaussian Splatting require?
+
+## Data Collection & Networking
+- Should we keep the Raspberry Pi as the local “hub” (collecting images and metadata) or upload directly to a cloud service?  
+- How should the Raspberry Pi forward completed sessions to the GPU machine or cloud instance (e.g., rsync, scp, API call)?  
+- How do we organize and store session metadata (patient/wound IDs, timestamps) in a standardized structure?  
+
+## Triggering
+- Should the capture be triggered from a web interface (mobile-friendly GUI) or via a physical hardware button?  
+- Is it feasible and secure to host the web interface on the Raspberry Pi and access it from a smartphone over the local network?  
+
+## Gaussian Splatting / Reconstruction
+- Which reconstruction tool should we use:  
+  - Nerfstudio or Jawset Postshot ?  
+- What preprocessing is needed for the images (background removal, resizing, masking) before splatting?  
+- Where should the reconstruction happen:  
+  - Local GPU workstation? 
+  - Cloud GPU instance?  
+- If using cloud GPUs, what is the expected cost?  
+- Should the reconstruction be triggered automatically after upload or started manually?
+
+## Output & Visualization
+- How should the resulting 3D models be stored, accessed, or displayed?  
+- If models are produced in the cloud, how do we transfer or visualize them locally (e.g., download `.ply`, host web viewer, screenshots)?
+
+
+
+---
+  
+
 ## 1. What We Already Have / Agreed Upon
 
 ### Core Concept
