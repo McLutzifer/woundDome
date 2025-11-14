@@ -12,13 +12,13 @@ The result should demonstrate the feasibility of automated, reproducible 3D docu
 
 ### Criterion 1: Reliable Image Capture and Synchronization
 **Description:**  
-All ESP32 cameras can be triggered simultaneously via MQTT, and captured images are successfully received and stored with metadata.
+All ESP32 cameras can be triggered simultaneously via MQTT, and captured images. The backend Criteria is described in Criteria two.
 
 | Quality Level | Description | Points |
 |----------------|--------------|--------|
 | **Minimum (50%)** | One ESP32-CAM can be triggered manually or via MQTT and successfully uploads its image to the server. | 5 |
-| **Target (75%)** | Several cameras (≥3) can capture simultaneously via MQTT and upload images to the Raspberry Pi reliably. | 7 |
-| **Optimal (100%)** | 10+ cameras capture in synchronization with timestamp accuracy <100 ms, and all uploads are automatically verified and logged. | 10 |
+| **Target (75%)** | Several cameras can capture simultaneously via MQTT and upload images to the Raspberry Pi reliably. | 7 |
+| **Optimal (100%)** | The ESPs cache the pictures on SD cards and send it via a queue to prevent overloading. | 10 |
 
 **Max Points:** 10  
 
@@ -32,9 +32,9 @@ The Raspberry Pi collects images and metadata, manages sessions, and forwards da
 |----------------|--------------|--------|
 | **Minimum (50%)** | FastAPI server accepts uploads and stores session data locally. | 5 |
 | **Target (75%)** | Server includes a working web UI to trigger captures and monitor uploads. | 7 |
-| **Optimal (100%)** | Automated transfer of sessions to GPU/cloud and complete session tracking with metadata and logs. | 10 |
+| **Optimal (100%)** | Automated transfer of sessions to GPU/cloud | 10 |
 
-**Max Points:** 10  
+**Max Points:** 10
 
 ---
 
@@ -46,9 +46,9 @@ Captured images are processed into a 3D representation using Gaussian Splatting 
 |----------------|--------------|--------|
 | **Minimum (50%)** | A static dataset can be processed manually into a 3D model using an existing Gaussian Splatting tool. | 5 |
 | **Target (75%)** | The Pi-generated sessions can be reconstructed with a semi-automated script in a GPU environment. | 7 |
-| **Optimal (100%)** | Fully integrated pipeline: automatic upload, processing, and visualization of 3D models in a viewer or via screenshots. | 15 |
+| **Optimal (100%)** | Fully integrated pipeline: automatic upload, processing, and visualization of 3D models in a viewer or via screenshots. | 10 |
 
-**Max Points:** 15  
+**Max Points:** 10  
 
 ---
 
