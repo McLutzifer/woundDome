@@ -4,12 +4,13 @@ import time
 
 app = Flask(__name__)
 
-UPLOAD_ROOT = "captures"
+UPLOAD_DIR = "captures"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Create ONE session folder when the server starts
-SESSION_FOLDER = time.strftime("%Y%m%d_%H%M%S")
-SAVE_DIR = os.path.join(UPLOAD_ROOT, SESSION_FOLDER)
-os.makedirs(SAVE_DIR, exist_ok=True)
+#SESSION_FOLDER = time.strftime("%Y%m%d_%H%M%S")
+#SAVE_DIR = os.path.join(UPLOAD_ROOT, SESSION_FOLDER)
+#os.makedirs(SAVE_DIR, exist_ok=True)
 
 
 @app.route("/upload", methods=["POST"])
@@ -20,7 +21,7 @@ def upload_image():
     image = request.files["image"]
     filename = image.filename or f"{int(time.time() * 1000)}.jpg"
 
-    filepath = os.path.join(SAVE_DIR, filename)
+    filepath = os.path.join(UPLOAD_DIR, filename)
     image.save(filepath)
 
     print(f"Saved image to {filepath}")
@@ -28,5 +29,5 @@ def upload_image():
 
 
 if __name__ == "__main__":
-    os.makedirs(UPLOAD_ROOT, exist_ok=True)
+    #os.makedirs(UPLOAD_ROOT, exist_ok=True)
     app.run(host="0.0.0.0", port=8000, debug=False)
