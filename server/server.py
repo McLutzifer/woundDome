@@ -15,6 +15,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @app.route("/upload", methods=["POST"])
 def upload_image():
+    '''
     if "image" not in request.files:
         return "No image part", 400
 
@@ -26,6 +27,22 @@ def upload_image():
 
     print(f"Saved image to {filepath}")
     return "OK", 200
+    '''
+
+    raw = request.data  # RAW JPEG rein
+
+    if not raw:
+        return "No data received", 400
+
+    filename = f"{int(time.time() * 1000)}.jpg"
+    filepath = os.path.join(UPLOAD_ROOT, filename)
+
+    with open(filepath, "wb") as f:
+        f.write(raw)
+
+    print(f"Saved RAW JPEG to {filepath}")
+    return "OK", 200
+
 
 
 if __name__ == "__main__":
