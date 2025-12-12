@@ -14,7 +14,7 @@ import shutil
 import sys
 
 # ============================================
-# CONFIGURATION - ADAPT TO YOUR SYSTEM
+# CONFIGURATION
 # ============================================
 MQTT_BROKER_IP = "10.66.64.206"
 MQTT_TOPIC = "esp32cam/cmd"
