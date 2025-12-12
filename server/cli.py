@@ -49,7 +49,7 @@ def upload_image():
     with open(filepath, "wb") as f:
         f.write(raw)
 
-    print(f"  ✓ Saved image: {filename}")
+    print(f" Saved image: {filename}")
     return "OK", 200
 
 
