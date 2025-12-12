@@ -35,7 +35,7 @@ def upload_image():
         return "No data received", 400
 
     filename = f"{int(time.time() * 1000)}.jpg"
-    filepath = os.path.join(UPLOAD_ROOT, filename)
+    filepath = os.path.join(UPLOAD_DIR, filename)
 
     with open(filepath, "wb") as f:
         f.write(raw)
