@@ -205,7 +205,7 @@ def show_menu():
 def show_status():
     """Show current status"""
     image_count = len(list(UPLOAD_DIR.glob("*.jpg")))
-    print(f"\n📊 Status:")
+    print(f"\nStatus:")
     print(f"  Server: {'🟢 Running' if server_running else '🔴 Stopped'}")
     print(f"  Images captured: {image_count}")
     print(f"  MQTT Broker: {MQTT_BROKER_IP}")
