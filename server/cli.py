@@ -17,7 +17,7 @@ import re
 # ============================================
 # CONFIGURATION - ADAPT TO YOUR SYSTEM
 # ============================================
-MQTT_BROKER_IP = "10.167.157.206" # Caros IP
+MQTT_BROKER_IP = "10.167.157.26" # Caros IP
 MQTT_TOPIC = "esp32cam/cmd"
 MQTT_MESSAGE = "capture"
 MOSQUITTO_PUB_CMD = r"C:\Program Files\mosquitto\mosquitto_pub.exe"  # Adapt this path if different
@@ -143,7 +143,7 @@ def ensure_images_in_workspace():
 
 
 def run_lichtfeld():
-    """Run LichtFeld-Studio processing with live training status"""
+    """Run LichtFeld-Studio training with live status + latest snapshot"""
 
     print("\n" + "=" * 60)
     print("[LICHTFELD] Running LichtFeld-Studio...")
@@ -151,9 +151,15 @@ def run_lichtfeld():
 
     LFS_OUTPUT_DIR.mkdir(exist_ok=True)
 
-    # Directory of LichtFeld-Studio.exe (important for weights/)
-    lfs_dir = Path(LFS_CMD).parent
+    # Folder that always contains the latest snapshot
+    latest_dir = LFS_OUTPUT_DIR / "latest"
 
+    # ===== TIME-BASED SNAPSHOT CONFIG =====
+    snapshot_interval_seconds = 120  # alle 2 Minuten
+    last_snapshot_time = time.time()
+    # =====================================
+
+    lfs_dir = Path(LFS_CMD).parent
     total_iterations = 15000
 
     cmd = [
@@ -169,10 +175,8 @@ def run_lichtfeld():
 
     print(f"[LICHTFELD] Command: {' '.join(cmd)}")
     print(f"[LICHTFELD] Working directory: {lfs_dir}")
+    print(f"[INFO] Snapshot every {snapshot_interval_seconds} seconds")
     print(f"[INFO] Training will run for {total_iterations} iterations...\n")
-
-    # Regex to detect iteration output
-    iter_regex = re.compile(r"(iter|iteration|step)\s*[:=]?\s*(\d+)", re.IGNORECASE)
 
     spinner = ["|", "/", "-", "\\"]
     spin_idx = 0
@@ -190,37 +194,59 @@ def run_lichtfeld():
 
         for line in process.stdout:
             line = line.strip()
-            if not line:
-                continue
 
-            # Try to extract iteration number
-            match = iter_regex.search(line)
-            if match:
-                current_iter = int(match.group(2))
-                progress = (current_iter / total_iterations) * 100
+            # ===== STATUS HEARTBEAT =====
+            if time.time() - last_status_time > 1.0:
                 print(
-                    f"\r[TRAINING] Iteration {current_iter}/{total_iterations} "
-                    f"({progress:5.1f}%)",
+                    f"\r[TRAINING] Running {spinner[spin_idx % len(spinner)]}",
                     end="",
                     flush=True
                 )
-            else:
-                # Heartbeat spinner every ~1s
-                if time.time() - last_status_time > 1.0:
-                    print(
-                        f"\r[TRAINING] Running {spinner[spin_idx % len(spinner)]}",
-                        end="",
-                        flush=True
-                    )
-                    spin_idx += 1
-                    last_status_time = time.time()
+                spin_idx += 1
+                last_status_time = time.time()
 
-                # Still print relevant messages
-                if any(k in line.lower() for k in ["error", "warn", "loss", "cuda"]):
-                    print(f"\n[LICHTFELD] {line}")
+            # ===== TIME-BASED SNAPSHOT =====
+            now = time.time()
+            if now - last_snapshot_time >= snapshot_interval_seconds:
+                last_snapshot_time = now
+                print("\n[SNAPSHOT] Updating latest results...")
+
+                # Reset latest/
+                if latest_dir.exists():
+                    shutil.rmtree(latest_dir)
+                latest_dir.mkdir(parents=True, exist_ok=True)
+
+                # Copy newest splat_*.ply
+                splats = sorted(
+                    LFS_OUTPUT_DIR.glob("splat_*.ply"),
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True
+                )
+
+                if splats:
+                    shutil.copy2(splats[0], latest_dir / splats[0].name)
+
+                # Copy newest eval_* folder
+                eval_dirs = sorted(
+                    LFS_OUTPUT_DIR.glob("eval_*"),
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True
+                )
+
+                if eval_dirs:
+                    shutil.copytree(
+                        eval_dirs[0],
+                        latest_dir / eval_dirs[0].name
+                    )
+
+                print("[SNAPSHOT] Latest results updated")
+
+            # ===== IMPORTANT LOG LINES =====
+            if line and any(k in line.lower() for k in ["error", "warn", "loss", "cuda"]):
+                print(f"\n[LICHTFELD] {line}")
 
         process.wait()
-        print()  # newline after progress line
+        print()
 
         if process.returncode != 0:
             print(f"\n[WARN] LichtFeld-Studio exited with code {process.returncode}")
