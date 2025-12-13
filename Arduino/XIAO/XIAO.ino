@@ -12,7 +12,7 @@ const char* ssid     = "AndroidAP";
 const char* password = "stcl6416";
 
 // ================= MQTT =================
-const char* mqtt_host  = "10.193.54.206";
+const char* mqtt_host  = "HPPavilion";
 const uint16_t mqtt_port = 1883;
 const char* mqtt_user  = "";
 const char* mqtt_pass  = "";
@@ -228,9 +228,12 @@ void setup() {
     return;
   }
 
-  // Kamera
+    // --- Kamera-Config nur für XIAO ESP32S3 Sense ---
+  cfg = {};  // WICHTIG: alles auf 0 setzen
+
   cfg.ledc_channel = LEDC_CHANNEL_0;
   cfg.ledc_timer   = LEDC_TIMER_0;
+
   cfg.pin_d0       = Y2_GPIO_NUM;
   cfg.pin_d1       = Y3_GPIO_NUM;
   cfg.pin_d2       = Y4_GPIO_NUM;
@@ -239,6 +242,7 @@ void setup() {
   cfg.pin_d5       = Y7_GPIO_NUM;
   cfg.pin_d6       = Y8_GPIO_NUM;
   cfg.pin_d7       = Y9_GPIO_NUM;
+
   cfg.pin_xclk     = XCLK_GPIO_NUM;
   cfg.pin_pclk     = PCLK_GPIO_NUM;
   cfg.pin_vsync    = VSYNC_GPIO_NUM;
@@ -247,25 +251,30 @@ void setup() {
   cfg.pin_sccb_scl = SIOC_GPIO_NUM;
   cfg.pin_pwdn     = PWDN_GPIO_NUM;
   cfg.pin_reset    = RESET_GPIO_NUM;
+
   cfg.xclk_freq_hz = 20000000;
   cfg.pixel_format = PIXFORMAT_JPEG;
 
-  // Beim S3 lieber konservativ:
-  cfg.frame_size   = FRAMESIZE_QVGA; // kleiner = stabiler
-  cfg.jpeg_quality = 15;             // größere Zahl = kleinere Datei
-  if (psramFound()) {
-    cfg.fb_count = 2;
-    cfg.frame_size = FRAMESIZE_VGA;
-    cfg.jpeg_quality = 12;
-} else {
-    cfg.fb_count = 1;
-    cfg.frame_size = FRAMESIZE_QQVGA;
-}             // nur ein Framebuffer
+  cfg.grab_mode = CAMERA_GRAB_LATEST;
 
-  if (esp_camera_init(&cfg) != ESP_OK) {
-    Serial.println("Camera init failed");
-    return;
+  if (psramFound()) {
+    cfg.fb_location = CAMERA_FB_IN_PSRAM;
+    cfg.frame_size   = FRAMESIZE_VGA;
+    cfg.jpeg_quality = 15;
+    cfg.fb_count     = 2;
+  } else {
+    cfg.fb_location = CAMERA_FB_IN_DRAM;
+    cfg.frame_size   = FRAMESIZE_QVGA;
+    cfg.jpeg_quality = 20;
+    cfg.fb_count     = 1;
   }
+
+  esp_err_t err = esp_camera_init(&cfg);
+  if (err != ESP_OK) {
+    Serial.printf("Camera init failed: 0x%x\n", err);
+    while(true) delay(1000);
+  }
+  Serial.println("Camera init OK!");
 
 
   // WLAN
@@ -289,6 +298,7 @@ void setup() {
   }
 }
 
+
 // ---------- Loop ----------
 void loop() {
   static unsigned long lastLog = 0;
@@ -310,7 +320,7 @@ void loop() {
     // kleine Pause, damit Kamera / WiFi sich "fangen"
     delay(200);
 
-    bool ok = captureAndSend("/latest.jpg", "http://10.193.54.26:8000/upload", doUpload);
+    bool ok = captureAndSend("/latest.jpg", "http://HPPavilion:8000/upload", doUpload);
 
     if (doUpload) {
       mqtt.publish(topic_stat, ok ? "captured" : "capture_failed", false);

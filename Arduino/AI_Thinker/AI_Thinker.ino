@@ -12,7 +12,7 @@ const char* ssid     = "AndroidAP";
 const char* password = "stcl6416";
 
 // ================= MQTT =================
-const char* mqtt_host  = "10.193.54.206";
+const char* mqtt_host  = "10.167.157.206";
 const uint16_t mqtt_port = 1883;
 const char* mqtt_user  = "";
 const char* mqtt_pass  = "";
@@ -310,7 +310,7 @@ void loop() {
     // kleine Pause, damit Kamera / WiFi sich "fangen"
     delay(200);
 
-    bool ok = captureAndSend("/latest.jpg", "http://10.193.54.26:8000/upload", doUpload);
+    bool ok = captureAndSend("/latest.jpg", "http://10.167.157.26:8000/upload", doUpload);
 
     if (doUpload) {
       mqtt.publish(topic_stat, ok ? "captured" : "capture_failed", false);
