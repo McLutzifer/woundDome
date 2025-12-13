@@ -12,13 +12,15 @@ from flask import Flask, request
 import os
 import shutil
 import sys
+import re
 
 # ============================================
-# CONFIGURATION
+# CONFIGURATION - ADAPT TO YOUR SYSTEM
 # ============================================
-MQTT_BROKER_IP = "10.66.64.206"
+MQTT_BROKER_IP = "10.167.157.206" # Caros IP
 MQTT_TOPIC = "esp32cam/cmd"
 MQTT_MESSAGE = "capture"
+MOSQUITTO_PUB_CMD = r"C:\Program Files\mosquitto\mosquitto_pub.exe"  # Adapt this path if different
 
 COLMAP_CMD = r"C:\Users\Admin\wounddome_server\colmap-x64-windows-cuda\COLMAP.bat"
 LFS_CMD = r"C:\Users\Admin\repos\LichtFeld-Studio\build\LichtFeld-Studio.exe"
@@ -49,7 +51,7 @@ def upload_image():
     with open(filepath, "wb") as f:
         f.write(raw)
 
-    print(f" Saved image: {filename}")
+    print(f"  [OK] Saved image: {filename}")
     return "OK", 200
 
 
@@ -58,15 +60,15 @@ def start_server():
     global server_running
     UPLOAD_DIR.mkdir(exist_ok=True)
     server_running = True
-    print(f"\n Server starting on http://0.0.0.0:8000")
-    print(f"Saving images to: {UPLOAD_DIR.resolve()}\n")
-    app.run(host="0.0.0.0", port=8000, debug=False, use_reloader=False)
+    print(f"\n[SERVER] Starting on http://0.0.0.0:8000")
+    print(f"[SERVER] Saving images to: {UPLOAD_DIR.resolve()}\n")
+    app.run(host="0.0.0.0", port=8000, debug=False, use_reloader=False, threaded=True, processes=1)
 
 
 def send_mqtt_capture():
     """Send MQTT command to trigger ESP32 cameras"""
     cmd = [
-        "mosquitto_pub",
+        MOSQUITTO_PUB_CMD,
         "-h", MQTT_BROKER_IP,
         "-t", MQTT_TOPIC,
         "-m", MQTT_MESSAGE
@@ -75,26 +77,27 @@ def send_mqtt_capture():
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
-            print("Capture command sent!")
+            print("  [MQTT] Capture command sent!")
             return True
         else:
-            print(f"MQTT command failed: {result.stderr}")
+            print(f"  [WARN] MQTT command failed: {result.stderr}")
             return False
     except FileNotFoundError:
-        print("mosquitto_pub not found. Install Mosquitto MQTT broker.")
+        print(f"  [ERROR] mosquitto_pub not found at: {MOSQUITTO_PUB_CMD}")
+        print("     Please update MOSQUITTO_PUB_CMD in the configuration section")
         return False
     except subprocess.TimeoutExpired:
-        print("MQTT command timed out")
+        print("  [WARN] MQTT command timed out")
         return False
     except Exception as e:
-        print(f"Error sending MQTT: {e}")
+        print(f"  [ERROR] Error sending MQTT: {e}")
         return False
 
 
 def run_colmap():
     """Run COLMAP reconstruction"""
     print("\n" + "="*60)
-    print("Running COLMAP reconstruction...")
+    print("[COLMAP] Running reconstruction...")
     print("="*60)
     
     COLMAP_WORKSPACE.mkdir(exist_ok=True)
@@ -117,14 +120,14 @@ def run_colmap():
         print("STDERR:", result.stderr)
 
     if result.returncode != 0:
-        print(f"\nCOLMAP exited with code {result.returncode}")
+        print(f"\n[WARN] COLMAP exited with code {result.returncode}")
     else:
-        print("\nCOLMAP completed successfully")
+        print("\n[OK] COLMAP completed successfully")
 
 
 def ensure_images_in_workspace():
     """Copy images to colmap_ws/images for LichtFeld-Studio"""
-    print("\nPreparing workspace for LichtFeld-Studio...")
+    print("\n[PREP] Preparing workspace for LichtFeld-Studio...")
     
     images_dir = COLMAP_WORKSPACE / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
@@ -136,57 +139,118 @@ def ensure_images_in_workspace():
             shutil.copy2(f, target)
             count += 1
 
-    print(f"Copied {count} images to workspace")
+    print(f"  [OK] Copied {count} images to workspace")
 
 
 def run_lichtfeld():
-    """Run LichtFeld-Studio processing"""
-    print("\n" + "="*60)
-    print("Running LichtFeld-Studio...")
-    print("="*60)
-    
+    """Run LichtFeld-Studio processing with live training status"""
+
+    print("\n" + "=" * 60)
+    print("[LICHTFELD] Running LichtFeld-Studio...")
+    print("=" * 60)
+
     LFS_OUTPUT_DIR.mkdir(exist_ok=True)
+
+    # Directory of LichtFeld-Studio.exe (important for weights/)
+    lfs_dir = Path(LFS_CMD).parent
+
+    total_iterations = 15000
 
     cmd = [
         LFS_CMD,
-        "-d", str(COLMAP_WORKSPACE),
-        "-o", str(LFS_OUTPUT_DIR),
+        "-d", str(COLMAP_WORKSPACE.resolve()),
+        "-o", str(LFS_OUTPUT_DIR.resolve()),
+        "-i", str(total_iterations),
+        "--headless",
+        "--gut",
+        "--eval",
+        "--save-eval-images",
     ]
 
-    print(f"Command: {' '.join(cmd)}\n")
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"[LICHTFELD] Command: {' '.join(cmd)}")
+    print(f"[LICHTFELD] Working directory: {lfs_dir}")
+    print(f"[INFO] Training will run for {total_iterations} iterations...\n")
 
-    print(result.stdout)
-    if result.stderr:
-        print("STDERR:", result.stderr)
+    # Regex to detect iteration output
+    iter_regex = re.compile(r"(iter|iteration|step)\s*[:=]?\s*(\d+)", re.IGNORECASE)
 
-    if result.returncode != 0:
-        print(f"\nLichtFeld-Studio exited with code {result.returncode}")
-    else:
-        print(f"\nLichtFeld-Studio completed successfully")
-        print(f"Output saved to: {LFS_OUTPUT_DIR.resolve()}")
+    spinner = ["|", "/", "-", "\\"]
+    spin_idx = 0
+    last_status_time = time.time()
 
+    try:
+        process = subprocess.Popen(
+            cmd,
+            cwd=str(lfs_dir),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+
+        for line in process.stdout:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Try to extract iteration number
+            match = iter_regex.search(line)
+            if match:
+                current_iter = int(match.group(2))
+                progress = (current_iter / total_iterations) * 100
+                print(
+                    f"\r[TRAINING] Iteration {current_iter}/{total_iterations} "
+                    f"({progress:5.1f}%)",
+                    end="",
+                    flush=True
+                )
+            else:
+                # Heartbeat spinner every ~1s
+                if time.time() - last_status_time > 1.0:
+                    print(
+                        f"\r[TRAINING] Running {spinner[spin_idx % len(spinner)]}",
+                        end="",
+                        flush=True
+                    )
+                    spin_idx += 1
+                    last_status_time = time.time()
+
+                # Still print relevant messages
+                if any(k in line.lower() for k in ["error", "warn", "loss", "cuda"]):
+                    print(f"\n[LICHTFELD] {line}")
+
+        process.wait()
+        print()  # newline after progress line
+
+        if process.returncode != 0:
+            print(f"\n[WARN] LichtFeld-Studio exited with code {process.returncode}")
+        else:
+            print(f"\n[OK] LichtFeld-Studio completed successfully")
+            print(f"[OUTPUT] Saved to: {LFS_OUTPUT_DIR.resolve()}")
+
+    except Exception as e:
+        print(f"\n[ERROR] LichtFeld-Studio crashed: {e}")
 
 def run_pipeline():
     """Execute the full COLMAP + LichtFeld pipeline"""
     image_count = len(list(UPLOAD_DIR.glob("*.jpg")))
     
     if image_count == 0:
-        print("\nNo images found in captures directory!")
-        print("Please capture some images first (press X)")
+        print("\n[ERROR] No images found in captures directory!")
+        print("   Please capture some images first (press X)")
         return
 
-    print(f"\nStarting pipeline with {image_count} images...")
+    print(f"\n[PIPELINE] Starting with {image_count} images...")
     
     try:
         run_colmap()
         ensure_images_in_workspace()
         run_lichtfeld()
         print("\n" + "="*60)
-        print("Pipeline completed successfully!")
+        print("[SUCCESS] Pipeline completed successfully!")
         print("="*60)
     except Exception as e:
-        print(f"\nPipeline error: {e}")
+        print(f"\n[ERROR] Pipeline error: {e}")
 
 
 def show_menu():
@@ -205,8 +269,8 @@ def show_menu():
 def show_status():
     """Show current status"""
     image_count = len(list(UPLOAD_DIR.glob("*.jpg")))
-    print(f"\nStatus:")
-    print(f"  Server: {'🟢 Running' if server_running else '🔴 Stopped'}")
+    print(f"\n[STATUS]")
+    print(f"  Server: {'Running' if server_running else 'Stopped'}")
     print(f"  Images captured: {image_count}")
     print(f"  MQTT Broker: {MQTT_BROKER_IP}")
 
@@ -214,21 +278,21 @@ def show_status():
 def clear_captures():
     """Clear all captured images"""
     if not UPLOAD_DIR.exists():
-        print("\n No captures directory found")
+        print("\n[INFO] No captures directory found")
         return
     
     images = list(UPLOAD_DIR.glob("*.jpg"))
     if not images:
-        print("\nNo images to clear")
+        print("\n[INFO] No images to clear")
         return
     
-    confirm = input(f"\n⚠ Delete {len(images)} images? (yes/no): ").strip().lower()
+    confirm = input(f"\n[WARN] Delete {len(images)} images? (yes/no): ").strip().lower()
     if confirm == "yes":
         for img in images:
             img.unlink()
-        print(f"Deleted {len(images)} images")
+        print(f"[OK] Deleted {len(images)} images")
     else:
-        print("Cancelled")
+        print("[INFO] Cancelled")
 
 
 def main():
@@ -251,7 +315,7 @@ def main():
             cmd = input("\nCommand: ").strip().upper()
             
             if cmd == "X":
-                print("\nTriggering capture...")
+                print("\n[CAPTURE] Triggering capture...")
                 send_mqtt_capture()
                 
             elif cmd == "Y":
@@ -264,7 +328,7 @@ def main():
                 clear_captures()
                 
             elif cmd == "Q":
-                print("\nShutting down...")
+                print("\n[SHUTDOWN] Shutting down...")
                 server_running = False
                 break
                 
@@ -272,11 +336,11 @@ def main():
                 continue
                 
             else:
-                print(f"Unknown command: {cmd}")
+                print(f"[ERROR] Unknown command: {cmd}")
                 show_menu()
                 
     except KeyboardInterrupt:
-        print("\nInterrupted - shutting down...")
+        print("\n\n[SHUTDOWN] Interrupted - shutting down...")
         server_running = False
     
     print("Goodbye!\n")
